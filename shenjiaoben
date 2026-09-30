@@ -1062,21 +1062,3 @@ if success and code then
             end
         end)
     end
-    CreateFovGui()
-
-    -- 更新FOV圈大小（只改画面圆圈，不影响吸附）
-    local function UpdateFovCircleSize(radius)
-        if not fovCircleFrame then return end
-        fovCircleFrame.Size = UDim2.new(0, radius*2, 0, radius*2)
-    end
-
-    Tab4:AddSwitch("开启子追自瞄",function(state)
-        AimbotEnabled = state
-        if AimbotLoopConn then AimbotLoopConn:Disconnect() AimbotLoopConn = nil end
-        if state then
-            AimbotLoopConn = RunService.RenderStepped:Connect(function()
-                if not AimbotEnabled then return end
-                local cam = workspace.CurrentCamera
-                local localChar = lp.Character
-                if not localChar then return end
-                local
