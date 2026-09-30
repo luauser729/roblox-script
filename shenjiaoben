@@ -1,0 +1,1126 @@
+local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local NewUIUrl = "https://raw.githubusercontent.com/sdxs221/sd/main/Newui"
+
+local success, code = pcall(function()
+    return game:HttpGet(NewUIUrl)
+end)
+
+if success and code then
+    local Library = loadstring(code)()
+    
+    local Window = Library.CreateWindow("神脚本")
+    Window.FloatBall.Image = "rbxassetid://100987077383366"
+
+    local lp = game.Players.LocalPlayer
+    local injector = identifyexecutor and identifyexecutor() or "未知注入器"
+    local accountDay = lp.AccountAge
+    local uid = lp.UserId
+    local uname = lp.Name
+    local serverId = game.JobId
+
+    local showUserInfo = false
+    local userInfoGui = nil
+    local playerNotifyEnabled = false
+    local playerJoinConn,playerLeaveConn
+
+    local showFps = false
+    local fpsGui = nil
+    local fpsLabel = nil
+    local fpsLoopConn = nil
+
+    local antiAfkOn = false
+    local antiAfkLoop = nil
+
+    local rotateSpeed = 0
+    local rotateLoop = nil
+
+    local walkSpeed = 16
+    local jumpPower = 50
+    local fovValue = 70
+    local gravityVal = 196.2
+
+    local showPosHp = false
+    local posHpFolder
+    local CoreGui = game:GetService("CoreGui")
+    if CoreGui:FindFirstChild("PosHpTags") then
+        CoreGui.PosHpTags:Destroy()
+    end
+    posHpFolder = Instance.new("Folder")
+    posHpFolder.Name = "PosHpTags"
+    posHpFolder.Parent = CoreGui
+    local posHpConn = nil
+
+    local infiniteJump = false
+    local infJumpConn
+
+    local phaseThrough = false
+    local phaseConn
+
+    local flyUi = nil
+    local flyEnabled = false
+    local kongFlyLoader = nil
+
+    --====射线函数====
+    local function HasLineOfSight(startPos,endPos)
+        local rp = RaycastParams.new()
+        rp.FilterDescendantsInstances = {lp.Character}
+        rp.FilterType = Enum.RaycastFilterType.Exclude
+        local ray = workspace:Raycast(startPos, endPos - startPos, rp)
+        return ray == nil
+    end
+
+    local function applyHumanoidSettings()
+        local char = lp.Character
+        if not char then return end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hum then return end
+        if hum.PlatformStand then return end
+        hum.WalkSpeed = walkSpeed
+        hum.JumpPower = jumpPower
+    end
+
+    lp.CharacterAdded:Connect(function()
+        task.wait(0.15)
+        applyHumanoidSettings()
+        if infiniteJump then
+            if infJumpConn then infJumpConn:Disconnect() end
+            infJumpConn = UserInputService.JumpRequest:Connect(function()
+                local hum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
+                if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+            end)
+        end
+        if phaseThrough then
+            if phaseConn then phaseConn:Disconnect() end
+            phaseConn = RunService.RenderStepped:Connect(function()
+                local c = lp.Character
+                if c then
+                    for _,part in ipairs(c:GetChildren()) do
+                        if part:IsA("BasePart") then
+                            part.CanCollide = false
+                        end
+                    end
+                end
+            end)
+        end
+    end)
+
+    local function ToggleInfiniteJump(state)
+        infiniteJump = state
+        if infJumpConn then infJumpConn:Disconnect() end
+        if state then
+            infJumpConn = UserInputService.JumpRequest:Connect(function()
+                local hum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
+                if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+            end)
+        end
+    end
+
+    local function TogglePhaseThrough(state)
+        phaseThrough = state
+        if phaseConn then phaseConn:Disconnect() phaseConn = nil end
+        if state then
+            phaseConn = RunService.RenderStepped:Connect(function()
+                local c = lp.Character
+                if c then
+                    for _,part in ipairs(c:GetChildren()) do
+                        if part:IsA("BasePart") then
+                            part.CanCollide = false
+                        end
+                    end
+                end
+            end)
+        else
+            local c = lp.Character
+            if c then
+                for _,part in ipairs(c:GetChildren()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = true
+                    end
+                end
+            end
+        end
+    end
+
+    local function UpdatePosHp()
+        local localChar = lp.Character
+        if not localChar then return end
+        local localHrp = localChar:FindFirstChild("HumanoidRootPart")
+        if not localHrp then return end
+
+        for _,plr in ipairs(game.Players:GetPlayers()) do
+            if plr ~= lp then
+                local char = plr.Character
+                if char then
+                    local hrp = char:FindFirstChild("HumanoidRootPart")
+                    local hum = char:FindFirstChildOfClass("Humanoid")
+                    if hrp and hum and hum.Health > 0 then
+                        local tag = posHpFolder:FindFirstChild(plr.Name.."_poshp")
+                        if showPosHp then
+                            if not tag then
+                                local bill = Instance.new("BillboardGui")
+                                bill.Name = plr.Name.."_poshp"
+                                bill.AlwaysOnTop = true
+                                bill.Size = UDim2.new(6,0,2.2,0)
+                                bill.StudsOffset = Vector3.new(0,4.5,0)
+                                bill.Adornee = hrp
+                                local lab = Instance.new("TextLabel")
+                                lab.BackgroundTransparency = 1
+                                lab.TextColor3 = Color3.new(0,1,0)
+                                lab.Font = Enum.Font.SourceSansBold
+                                lab.TextSize =13
+                                lab.Size = UDim2.new(1,0,1,0)
+                                lab.Parent = bill
+                                bill.Parent = posHpFolder
+                            end
+                            local lab = posHpFolder[plr.Name.."_poshp"]:FindFirstChildWhichIsA("TextLabel")
+                            local dist = math.floor((localHrp.Position - hrp.Position).Magnitude)
+                            lab.Text = string.format("%s\n距离:%d\nX:%.0f Y:%.0f Z:%.0f",
+                                plr.Name, dist, hrp.Position.X, hrp.Position.Y, hrp.Position.Z)
+                        else
+                            if tag then tag:Destroy() end
+                        end
+                    else
+                        if tag then tag:Destroy() end
+                    end
+                else
+                    local tag = posHpFolder:FindFirstChild(plr.Name.."_poshp")
+                    if tag then tag:Destroy() end
+                end
+            end
+        end
+    end
+
+    local function TogglePosHpTag(state)
+        showPosHp = state
+        if posHpConn then
+            posHpConn:Disconnect()
+            posHpConn = nil
+        end
+        if not state then
+            for _,v in ipairs(posHpFolder:GetChildren()) do
+                v:Destroy()
+            end
+            return
+        end
+        posHpConn = RunService.RenderStepped:Connect(UpdatePosHp)
+    end
+
+    local function ToggleFlySystem(state)
+        flyEnabled = state
+        if state then
+            game:GetService("StarterGui"):SetCore("SendNotification",{
+                Title = "Credits";
+                Text ="zhanghuihuihui";
+                Duration = 2.5;
+            })
+            local main = Instance.new("ScreenGui")
+            local Frame = Instance.new("Frame")
+            local up = Instance.new("TextButton")
+            local down = Instance.new("TextButton")
+            local onof = Instance.new("TextButton")
+            local TextLabel = Instance.new("TextLabel")
+            local plus = Instance.new("TextButton")
+            local speed = Instance.new("TextLabel")
+            local mine = Instance.new("TextButton")
+
+            main.Name = "main"
+            main.Parent = game.CoreGui
+            main.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+            flyUi = main
+
+            Frame.Parent = main
+            Frame.BackgroundColor3 = Color3.fromRGB(163, 255, 137)
+            Frame.BorderColor3 = Color3.fromRGB(103, 221, 213)
+            Frame.Position = UDim2.new(0.100320168, 0, 0.379746825, 0)
+            Frame.Size = UDim2.new(0, 190, 0, 57)
+
+            up.Name = "up"
+            up.Parent = Frame
+            up.BackgroundColor3 = Color3.fromRGB(79, 255, 152)
+            up.Size = UDim2.new(0, 44, 0, 28)
+            up.Font = Enum.Font.SourceSans
+            up.Text = "上升"
+            up.TextColor3 = Color3.fromRGB(0, 0, 0)
+            up.TextSize = 14.000
+
+            down.Name = "down"
+            down.Parent = Frame
+            down.BackgroundColor3 = Color3.fromRGB(215, 255, 121)
+            down.Position = UDim2.new(0, 0, 0.491228074, 0)
+            down.Size = UDim2.new(0, 44, 0, 28)
+            down.Font = Enum.Font.SourceSans
+            down.Text = "下降"
+            down.TextColor3 = Color3.fromRGB(0, 0, 0)
+            down.TextSize = 14.000
+
+            onof.Name = "onof"
+            onof.Parent = Frame
+            onof.BackgroundColor3 = Color3.fromRGB(255, 249, 74)
+            onof.Position = UDim2.new(0.702823281, 0, 0.491228074, 0)
+            onof.Size = UDim2.new(0, 56, 0, 28)
+            onof.Font = Enum.Font.SourceSans
+            onof.Text = "飞行"
+            onof.TextColor3 = Color3.fromRGB(0, 0, 0)
+            onof.TextSize = 14.000
+
+            TextLabel.Parent = Frame
+            TextLabel.BackgroundColor3 = Color3.fromRGB(242, 60, 255)
+            TextLabel.Position = UDim2.new(0.469327301, 0, 0, 0)
+            TextLabel.Size = UDim2.new(0, 100, 0, 28)
+            TextLabel.Font = Enum.Font.SourceSans
+            TextLabel.Text = "神飞行"
+            TextLabel.TextColor3 = Color3.new(0,0,0)
+            TextLabel.TextScaled = true
+
+            plus.Name = "plus"
+            plus.Parent = Frame
+            plus.BackgroundColor3 = Color3.fromRGB(133, 145, 255)
+            plus.Position = UDim2.new(0.231578946, 0, 0, 0)
+            plus.Size = UDim2.new(0, 45, 0, 28)
+            plus.Font = Enum.Font.SourceSans
+            plus.Text = "+"
+            plus.TextColor3 = Color3.new(0,0,0)
+            plus.TextScaled = true
+
+            speed.Name = "speed"
+            speed.Parent = Frame
+            speed.BackgroundColor3 = Color3.fromRGB(255, 85, 0)
+            speed.Position = UDim2.new(0.468421042, 0, 0.491228074, 0)
+            speed.Size = UDim2.new(0, 44, 0, 28)
+            speed.Font = Enum.Font.SourceSans
+            speed.Text = "1"
+            speed.TextColor3 = Color3.new(0,0,0)
+            speed.TextScaled = true
+
+            mine.Name = "mine"
+            mine.Parent = Frame
+            mine.BackgroundColor3 = Color3.fromRGB(123, 255, 247)
+            mine.Position = UDim2.new(0.231578946, 0, 0.491228074, 0)
+            mine.Size = UDim2.new(0, 45, 0, 29)
+            mine.Font = Enum.Font.SourceSans
+            mine.Text = "-"
+            mine.TextColor3 = Color3.new(0,0,0)
+            mine.TextScaled = true
+
+            local speeds = 1
+            local speaker = game:GetService("Players").LocalPlayer
+            local chr = game.Players.LocalPlayer.Character
+            local hum = chr and chr:FindFirstChildWhichIsA("Humanoid")
+            local nowe = false
+            Frame.Active = true
+            Frame.Draggable = true
+
+            onof.MouseButton1Down:connect(function()
+                if nowe == true then
+                    nowe = false
+                    speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing,true)
+                    speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown,true)
+                    speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Flying,true)
+                    speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall,true)
+                    speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp,true)
+                    speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping,true)
+                    speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Landed,true)
+                    speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Physics,true)
+                    speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding,true)
+                    speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll,true)
+                    speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Running,true)
+                    speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.RunningNoPhysics,true)
+                    speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated,true)
+                    speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.StrafingNoPhysics,true)
+                    speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Swimming,true)
+                    speaker.Character.Humanoid:ChangeState(Enum.HumanoidStateType.RunningNoPhysics)
+                else 
+                    nowe = true
+                    for i = 1, speeds do
+                        spawn(function()
+                            local hb = game:GetService("RunService").Heartbeat	
+                            local tpwalking = true
+                            local chr = game.Players.LocalPlayer.Character
+                            local hum = chr and chr:FindFirstChildWhichIsA("Humanoid")
+                            while tpwalking and hb:Wait() and chr and hum and hum.Parent do
+                                if hum.MoveDirection.Magnitude > 0 then
+                                    chr:TranslateBy(hum.MoveDirection)
+                                end
+                            end
+                        end)
+                    end
+                    game.Players.LocalPlayer.Character.Animate.Disabled = true
+                    local Char = game.Players.LocalPlayer.Character
+                    local Hum = Char:FindFirstChildOfClass("Humanoid") or Char:FindFirstChildOfClass("AnimationController")
+                    for i,v in next, Hum:GetPlayingAnimationTracks() do
+                        v:AdjustSpeed(0)
+                    end
+                    speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing,false)
+                    speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown,false)
+                    speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Flying,false)
+                    speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall,false)
+                    speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp,false)
+                    speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping,false)
+                    speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Landed,false)
+                    speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Physics,false)
+                    speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding,false)
+                    speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll,false)
+                    speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Running,false)
+                    speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.RunningNoPhysics,false)
+                    speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated,false)
+                    speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.StrafingNoPhysics,false)
+                    speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Swimming,false)
+                    speaker.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Swimming)
+                    local plr = game.Players.LocalPlayer
+                    local UpperTorso = plr.Character.LowerTorso
+                    local deb = true
+                    local ctrl = {f = 0, b = 0, l = 0, r = 0}
+                    local lastctrl = {f = 0, b = 0, l = 0, r = 0}
+                    local maxspeed = 50
+                    local spd = 0
+                    local bg = Instance.new("BodyGyro", UpperTorso)
+                    bg.P = 9e4
+                    bg.maxTorque = Vector3.new(9e9, 9e9, 9e9)
+                    bg.cframe = UpperTorso.CFrame
+                    local bv = Instance.new("BodyVelocity", UpperTorso)
+                    bv.velocity = Vector3.new(0,0.1,0)
+                    bv.maxForce = Vector3.new(9e9, 9e9)
+                    if nowe == true then
+                        plr.Character.Humanoid.PlatformStand = true
+                    end
+                    while nowe == true and game:GetService("Players").LocalPlayer.Character.Humanoid.Health > 0 do
+                        wait()
+                        if ctrl.l + ctrl.r ~= 0 or ctrl.f + ctrl.b ~= 0 then
+                            spd = spd+.5+(spd/maxspeed)
+                            if spd > maxspeed then
+                                spd = maxspeed
+                            end
+                        elseif not (ctrl.l + ctrl.r ~= 0 or ctrl.f + ctrl.b ~= 0) and spd ~= 0 then
+                            spd = spd-1
+                            if spd < 0 then
+                                spd = 0
+                            end
+                        end
+                        if (ctrl.l + ctrl.r) ~= 0 or (ctrl.f + ctrl.b) ~= 0 then
+                            bv.velocity = ((game.Workspace.CurrentCamera.CoordinateFrame.lookVector * (ctrl.f+ctrl.b)) + ((game.Workspace.CurrentCamera.CoordinateFrame * CFrame.new(ctrl.l+ctrl.r,(ctrl.f+ctrl.b)*.2,0).p) - game.Workspace.CurrentCamera.CoordinateFrame.p))*spd
+                            lastctrl = {f = ctrl.f, b = ctrl.b, l = ctrl.l, r = ctrl.r}
+                        elseif (ctrl.l + ctrl.r) == 0 and (ctrl.f + ctrl.b) == 0 and spd ~= 0 then
+                            bv.velocity = ((game.Workspace.CurrentCamera.CoordinateFrame.lookVector * (lastctrl.f+lastctrl.b)) + ((game.Workspace.CurrentCamera.CoordinateFrame * CFrame.new(lastctrl.l+lastctrl.r,(lastctrl.f+lastctrl.b)*.2,0).p) - game.Workspace.CurrentCamera.CoordinateFrame.p))*spd
+                        else
+                            bv.velocity = Vector3.new(0,0,0)
+                        end
+                        bg.cframe = game.Workspace.CurrentCamera.CoordinateFrame * CFrame.Angles(-math.rad((ctrl.f+ctrl.b)*50*spd/maxspeed),0,0)
+                    end
+                    ctrl = {f = 0, b = 0, l = 0, r = 0}
+                    lastctrl = {f = 0, b = 0, l = 0, r = 0}
+                    spd = 0
+                    bg:Destroy()
+                    bv:Destroy()
+                    plr.Character.Humanoid.PlatformStand = false
+                    local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
+                    if hrp then
+                        hrp.AssemblyLinearVelocity = Vector3.new(0,0,0)
+                    end
+                    plr.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Running)
+                    game.Players.LocalPlayer.Character.Animate.Disabled = false
+                end
+            end)
+
+            up.MouseButton1Down:connect(function()
+                game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(0,2,0)
+            end)
+
+            down.MouseButton1Down:connect(function()
+                game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(0,-2,0)
+            end)
+
+            game:GetService("Players").LocalPlayer.CharacterAdded:Connect(function(char)
+                wait(0.7)
+                game.Players.LocalPlayer.Character.Humanoid.PlatformStand = false
+                game.Players.LocalPlayer.Character.Animate.Disabled = false
+            end)
+
+            plus.MouseButton1Down:connect(function()
+                speeds = speeds + 1
+                speed.Text = speeds
+            end)
+
+            mine.MouseButton1Down:connect(function()
+                if speeds == 1 then
+                    speed.Text = 'can not be less than 1'
+                    wait(1)
+                    speed.Text = speeds
+                else
+                    speeds = speeds - 1
+                    speed.Text = speeds
+                end
+            end)
+        else
+            if flyUi then
+                flyUi:Destroy()
+                flyUi = nil
+                local plr = game.Players.LocalPlayer
+                local char = plr.Character
+                if char then
+                    local hrp = char:FindFirstChild("HumanoidRootPart")
+                    local hum = char:FindFirstChildOfClass("Humanoid")
+                    if hrp then
+                        hrp.AssemblyLinearVelocity = Vector3.new(0,0,0)
+                    end
+                    if hum then
+                        hum.PlatformStand = false
+                        hum:ChangeState(Enum.HumanoidStateType.Running)
+                    end
+                end
+            end
+        end
+    end
+
+    local function ToggleKongFly(state)
+        if state then
+            kongFlyLoader = loadstring(game:HttpGet("https://raw.githubusercontent.com/kongbaNB/9178/refs/heads/main/fly.lua"))()
+        else
+            warn("恐飞行远程脚本无法直接关闭，需要重生角色或者重进服务器关闭")
+        end
+    end
+
+    local function DestroyUserInfoPopup()
+        if userInfoGui then
+            userInfoGui:Destroy()
+            userInfoGui = nil
+        end
+    end
+
+    local function CreateUserInfoPopup()
+        DestroyUserInfoPopup()
+        local ScreenGui = Instance.new("ScreenGui")
+        ScreenGui.Name = "UserInfoPopup"
+        ScreenGui.ResetOnSpawn = false
+        ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        ScreenGui.Parent = lp.PlayerGui
+
+        local TextLabel = Instance.new("TextLabel")
+        TextLabel.Size = UDim2.new(0, 340, 0, 110)
+        TextLabel.Position = UDim2.new(0.72, 0, 0.04, 0)
+        TextLabel.BackgroundTransparency = 1
+        TextLabel.Font = Enum.Font.SourceSansBold
+        TextLabel.TextSize = 18
+        TextLabel.TextColor3 = Color3.new(1,1,1)
+        TextLabel.Text = "欢迎使用神脚本\n"..uname.."\nID："..tostring(uid)
+        TextLabel.ZIndex = 100
+        TextLabel.TextXAlignment = Enum.TextXAlignment.Left
+        TextLabel.Parent = ScreenGui
+        userInfoGui = ScreenGui
+    end
+
+    local function createNotifyText(msg)
+        local sg = Instance.new("ScreenGui")
+        sg.Parent = lp.PlayerGui
+        sg.Name = "PlayerNotify"
+        sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        local lb = Instance.new("TextLabel")
+        lb.Size = UDim2.new(0,320,0,70)
+        lb.Position = UDim2.new(0.02,0,0.75,0)
+        lb.BackgroundTransparency = 0.3
+        lb.BackgroundColor3 = Color3.new(0,0,0)
+        lb.TextColor3 = Color3.new(1,1,1)
+        lb.Font = Enum.Font.SourceSansBold
+        lb.TextSize = 16
+        lb.Text = msg
+        lb.Parent = sg
+        task.wait(3)
+        sg:Destroy()
+    end
+
+    local function TogglePlayerNotify(state)
+        playerNotifyEnabled = state
+        if state then
+            playerJoinConn = game.Players.PlayerAdded:Connect(function(plr)
+                createNotifyText("✅玩家进入："..plr.Name)
+            end)
+            playerLeaveConn = game.Players.PlayerRemoving:Connect(function(plr)
+                createNotifyText("❌玩家离开："..plr.Name)
+            end)
+        else
+            if playerJoinConn then playerJoinConn:Disconnect() end
+            if playerLeaveConn then playerLeaveConn:Disconnect() end
+        end
+    end
+
+    local function ToggleFpsDisplay(state)
+        showFps = state
+        if state then
+            if fpsGui then fpsGui:Destroy() end
+            fpsGui = Instance.new("ScreenGui")
+            fpsGui.Name = "FpsGui"
+            fpsGui.Parent = lp.PlayerGui
+            fpsLabel = Instance.new("TextLabel")
+            fpsLabel.Size = UDim2.new(0,120,0,35)
+            fpsLabel.Position = UDim2.new(0.72,0,0.18,0)
+            fpsLabel.BackgroundTransparency = 1
+            fpsLabel.TextColor3 = Color3.new(1,1,1)
+            fpsLabel.Font = Enum.Font.SourceSansBold
+            fpsLabel.TextSize = 17
+            fpsLabel.TextXAlignment = Enum.TextXAlignment.Left
+            fpsLabel.ZIndex = 200
+            fpsLabel.Parent = fpsGui
+
+            local dragging = false
+            local dragStartPos
+            local labelStartPos
+            fpsLabel.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType.MouseButton1 then
+                    dragging = true
+                    dragStartPos = input.Position
+                    labelStartPos = fpsLabel.Position
+                end
+            end)
+            game:GetService("UserInputService").InputChanged:Connect(function(input)
+                if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType.MouseMovement) then
+                    local delta = input.Position - dragStartPos
+                    fpsLabel.Position = UDim2.new(labelStartPos.X.Scale,labelStartPos.X.Offset+delta.X,labelStartPos.Y.Scale,labelStartPos.Y.Offset+delta.Y)
+                end
+            end)
+            game:GetService("UserInputService").InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType.MouseButton1 then dragging = false end
+            end)
+
+            fpsLoopConn = task.spawn(function()
+                local last = os.clock()
+                local frames = 0
+                while showFps do
+                    frames +=1
+                    local now = os.clock()
+                    if now - last >=1 then
+                        fpsLabel.Text = "FPS: "..tostring(frames)
+                        frames =0
+                        last = os.clock()
+                    end
+                    task.wait()
+                end
+            end)
+        else
+            showFps = false
+            if fpsLoopConn then task.cancel(fpsLoopConn) end
+            if fpsGui then fpsGui:Destroy() fpsGui = nil end
+        end
+    end
+
+    local function ToggleAntiAfk(state)
+        antiAfkOn = state
+        if state then
+            antiAfkLoop = task.spawn(function()
+                while antiAfkOn do
+                    task.wait(4)
+                    local char = lp.Character
+                    if char and char:FindFirstChild("Humanoid") then
+                        local hrp = char:FindFirstChild("HumanoidRootPart")
+                        if hrp then
+                            hrp.CFrame *= CFrame.Angles(0, math.rad(1),0)
+                        end
+                    end
+                end
+            end)
+        else
+            antiAfkOn = false
+            if antiAfkLoop then task.cancel(antiAfkLoop) end
+        end
+    end
+
+    local function StartRotate()
+        if rotateLoop then task.cancel(rotateLoop) rotateLoop = nil end
+        if rotateSpeed <=0 then return end
+        rotateLoop = task.spawn(function()
+            while rotateSpeed>0 do
+                task.wait()
+                local char = lp.Character
+                if char then
+                    local hum = char:FindFirstChildOfClass("Humanoid")
+                    if hum and hum.PlatformStand then continue end
+                    local hrp = char:FindFirstChild("HumanoidRootPart")
+                    if hrp then
+                        hrp.CFrame *= CFrame.Angles(0, math.rad(rotateSpeed/10),0)
+                    end
+                end
+            end
+        end)
+    end
+
+    local function SetWalkSpeed(speed)
+        walkSpeed = speed
+        local char = lp.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum and not hum.PlatformStand then
+                hum.WalkSpeed = walkSpeed
+            end
+        end
+    end
+
+    local function SetJumpPower(power)
+        jumpPower = power
+        local char = lp.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum and not hum.PlatformStand then
+                hum.JumpPower = jumpPower
+            end
+        end
+    end
+
+    local function SetFOV(fov)
+        fovValue = fov
+        workspace.CurrentCamera.FieldOfView = fovValue
+    end
+
+    local function SetGravity(g)
+        gravityVal = g
+        workspace.Gravity = gravityVal
+    end
+
+    local Tab1 = Window:CreateTab("信息")
+    Tab1:AddButton("你的注入器:"..injector, function() end)
+    Tab1:AddButton("你的账号年龄:"..tostring(accountDay).."天", function() end)
+    Tab1:AddButton("您的用户ID:"..tostring(uid), function() end)
+    Tab1:AddButton("您的用户名:"..uname, function() end)
+    Tab1:AddButton("您当前服务器的ID:"..serverId, function() end)
+    Tab1:AddButton("神脚本作者快手号：5733022742", function() end)
+
+    Tab1:AddSwitch("显示用户信息",function(state)
+        showUserInfo = state
+        if state then CreateUserInfoPopup() else DestroyUserInfoPopup() end
+    end)
+    Tab1:AddSwitch("玩家进出服务器通知",function(state) TogglePlayerNotify(state) end)
+    Tab1:AddSwitch("显示当前FPS(帧率)",function(state) ToggleFpsDisplay(state) end)
+    Tab1:AddSwitch("防挂机20分钟被踢",function(state) ToggleAntiAfk(state) end)
+
+    local Tab2 = Window:CreateTab("通用")
+    Tab2:AddSlider("原地旋转速度",0,3000,0,function(val)
+        rotateSpeed = val
+        StartRotate()
+    end)
+    Tab2:AddSlider("人物移动速度",16,200,16,function(val) SetWalkSpeed(val) end)
+    Tab2:AddSlider("跳跃高度",50,300,50,function(val) SetJumpPower(val) end)
+    Tab2:AddSlider("广角FOV",70,120,70,function(val) SetFOV(val) end)
+    Tab2:AddSlider("重力调节",50,400,196.2,function(val) SetGravity(val) end)
+    Tab2:AddSwitch("显示人物位置和血量",function(state) TogglePosHpTag(state) end)
+    Tab2:AddSwitch("无限跳跃",function(state) ToggleInfiniteJump(state) end)
+    Tab2:AddSwitch("穿墙",function(state) TogglePhaseThrough(state) end)
+
+    local Tab3 = Window:CreateTab("飞行")
+    Tab3:AddSwitch("神飞行",function(state) ToggleFlySystem(state) end)
+    Tab3:AddSwitch("恐飞行",function(state) ToggleKongFly(state) end)
+    Tab3:AddSwitch("柳叶飞行",function(state)
+        if state then
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/krlpl/er/refs/heads/main/GB%C3%BD%C3%BD%C3%BD%C3%BD-obfuscated.lua"))()
+        end
+    end)
+    Tab3:AddSwitch("坐标飞",function(state)
+        if state then
+            local Players = game:GetService("Players")
+            local RunService = game:GetService("RunService")
+            local TweenService = game:GetService("TweenService")
+            local UserInputService = game:GetService("UserInputService")
+
+            local lp = Players.LocalPlayer
+            local camera = workspace.CurrentCamera
+            local pgui = lp:WaitForChild("PlayerGui")
+
+            local mt = getrawmetatable(game)
+            local old = mt.__namecall
+            setreadonly(mt, false)
+            mt.__namecall = newcclosure(function(self, ...)
+                if getnamecallmethod() == "FireServer" and tostring(self) == "ForceSelfDamage" then
+                    return nil
+                end
+                return old(self, ...)
+            end)
+            setreadonly(mt, true)
+
+            if pgui:FindFirstChild("QiuRong_Silk_V15") then pgui.QiuRong_Silk_V15:Destroy() end
+            local ScreenGui = Instance.new("ScreenGui", pgui)
+            ScreenGui.Name = "QiuRong_Silk_V15"
+            ScreenGui.ResetOnSpawn = false
+
+            local MainFrame = Instance.new("Frame", ScreenGui)
+            MainFrame.Size = UDim2.new(0, 180, 0, 140)
+            MainFrame.Position = UDim2.new(0.5, -90, 0.4, 0)
+            MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+            MainFrame.BorderSizePixel = 0
+            MainFrame.ClipsDescendants = true
+            local UICorner = Instance.new("UICorner", MainFrame)
+            UICorner.CornerRadius = UDim.new(0, 15)
+
+            local Title = Instance.new("TextLabel", MainFrame)
+            Title.Size = UDim2.new(1, 0, 0, 30)
+            Title.BackgroundTransparency = 1
+            Title.Text = "官方"
+            Title.TextColor3 = Color3.new(0.8, 0.8, 0.8)
+            Title.TextSize = 12
+
+            local SpeedInput = Instance.new("TextBox", MainFrame)
+            SpeedInput.Size = UDim2.new(0, 140, 0, 30); SpeedInput.Position = UDim2.new(0.5, -70, 0, 40)
+            SpeedInput.BackgroundColor3 = Color3.fromRGB(40, 40, 40); SpeedInput.Text = "35"
+            SpeedInput.TextColor3 = Color3.new(1, 1, 1); Instance.new("UICorner", SpeedInput).CornerRadius = UDim.new(0, 8)
+
+            local Toggle = Instance.new("TextButton", MainFrame)
+            Toggle.Size = UDim2.new(0, 140, 0, 40); Toggle.Position = UDim2.new(0.5, -70, 0, 85)
+            Toggle.BackgroundColor3 = Color3.fromRGB(60, 60, 60); Toggle.Text = "纯坐标飞行: OFF"
+            Toggle.TextColor3 = Color3.new(1, 1, 1); Instance.new("UICorner", Toggle).CornerRadius = UDim.new(0, 10)
+
+            local dragging, dragInput, dragStart, startPos
+            local function update(input)
+                local delta = input.Position - dragStart
+                MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+
+            MainFrame.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType.Touch then
+                    dragging = true
+                    dragStart = input.Position
+                    startPos = MainFrame.Position
+                    input.Changed:Connect(function()
+                        if input.UserInputState == Enum.UserInputState.End then dragging = false end
+                    end)
+                end
+            end)
+
+            MainFrame.InputChanged:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType.Touch then
+                    dragInput = input
+                end
+            end)
+
+            UserInputService.InputChanged:Connect(function(input)
+                if input == dragInput and dragging then update(input) end
+            end)
+
+            local joystickActive = false
+            local joystickVector = Vector3.new()
+
+            local JoyBase = Instance.new("Frame", ScreenGui)
+            JoyBase.Size = UDim2.new(0, 130, 0, 130)
+            JoyBase.Position = UDim2.new(0, 40, 1, -160)
+            JoyBase.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            JoyBase.BackgroundTransparency = 0.6
+            JoyBase.Active = false
+            JoyBase.ZIndex = 100
+            JoyBase.Visible = false
+            local JoyBaseCorner = Instance.new("UICorner", JoyBase)
+            JoyBaseCorner.CornerRadius = UDim.new(1, 0)
+
+            local JoyKnob = Instance.new("Frame", JoyBase)
+            JoyKnob.Size = UDim2.new(0, 60, 0, 60)
+            JoyKnob.Position = UDim2.new(0.5, -30, 0.5, -30)
+            JoyKnob.BackgroundColor3 = Color3.fromRGB(80, 150, 255)
+            JoyKnob.BackgroundTransparency = 0.2
+            JoyKnob.ZIndex = 101
+            local JoyKnobCorner = Instance.new("UICorner", JoyKnob)
+            JoyKnobCorner.CornerRadius = UDim.new(1, 0)
+
+            local MAX_RADIUS = 50
+            local joyBasePos = Vector2.new()
+
+            local function updateJoystickFromTouch(touchPos)
+                local delta = touchPos - joyBasePos
+                local mag = delta.Magnitude
+                if mag > MAX_RADIUS then
+                    delta = delta.Unit * MAX_RADIUS
+                    mag = MAX_RADIUS
+                end
+                JoyKnob.Position = UDim2.new(0.5, delta.X - 30, 0.5, delta.Y - 30)
+                local norm = (mag > 1 and delta / MAX_RADIUS or delta / MAX_RADIUS)
+                joystickVector = Vector3.new(norm.X, 0, norm.Y)
+            end
+
+            local joyMode = false
+            local JoyButton = nil
+            local function setJoyMode(mode)
+                joyMode = mode
+                if JoyBase then JoyBase.Visible = false end
+                if JoyButton then
+                    JoyButton.Text = joyMode and "ON" or "摇"
+                    JoyButton.BackgroundColor3 = joyMode and Color3.fromRGB(0, 150, 255) or Color3.fromRGB(70, 70, 70)
+                end
+                if not joyMode then
+                    joystickActive = false
+                    joystickVector = Vector3.new()
+                end
+            end
+
+            local function isInJoyZone(pos)
+                if not joyMode then return false end
+                local vp = camera.ViewportSize
+                return pos.X <= vp.X * 0.5 and pos.Y >= vp.Y * 0.55
+            end
+
+            local joyDragInput = nil
+
+            UserInputService.InputBegan:Connect(function(input, processed)
+                if not joyMode then return end
+                if input.UserInputType == Enum.UserInputType.Touch then
+                    if isInJoyZone(input.Position) and not joyDragInput then
+                        joystickActive = true
+                        joyDragInput = input
+                        joyBasePos = input.Position
+                        JoyBase.Position = UDim2.fromOffset(input.Position.X - 65, input.Position.Y - 65)
+                        JoyBase.Visible = true
+                        JoyKnob.Position = UDim2.new(0.5, -30, 0.5, -30)
+                    end
+                end
+            end)
+
+            UserInputService.InputChanged:Connect(function(input, processed)
+                if not joyMode then return end
+                if joystickActive and joyDragInput and input == joyDragInput then
+                    if input.UserInputType == Enum.UserInputType.Touch then
+                        updateJoystickFromTouch(input.Position)
+                    end
+                end
+            end)
+
+            UserInputService.InputEnded:Connect(function(input, processed)
+                if joyDragInput and input == joyDragInput then
+                    joystickActive = false
+                    joystickVector = Vector3.new()
+                    joyDragInput = nil
+                    if joyMode then JoyBase.Visible = false end
+                end
+            end)
+
+            local isFlying = false
+            local flySpeed = 35
+            local animCache
+            local ControlModule = require(lp.PlayerScripts:WaitForChild("PlayerModule")):GetControls()
+            local flightConnection = nil
+            local lastUpdateTime = tick()
+
+            local function startFly()
+                local char = lp.Character or lp.CharacterAdded:Wait()
+                local hrp = char:WaitForChild("HumanoidRootPart")
+                local hum = char:WaitForChild("Humanoid")
+                local animate = char:FindFirstChild("Animate")
+
+                if animate then animCache = animate; animate.Parent = nil end
+                hum.AutoRotate = false
+
+                if flightConnection then flightConnection:Disconnect() end
+
+                lastUpdateTime = tick()
+                flightConnection = RunService.Heartbeat:Connect(function()
+                    if not isFlying or not char.Parent then
+                        if flightConnection then flightConnection:Disconnect() end
+                        return
+                    end
+
+                    local now = tick()
+                    local dt = now - lastUpdateTime
+                    lastUpdateTime = now
+
+                    local moveVec
+                    if joystickActive and joyMode then
+                        moveVec = joystickVector
+                    else
+                        moveVec = ControlModule:GetMoveVector()
+                    end
+
+                    local camCF = camera.CFrame
+                    local moveDir = (camCF.LookVector * -moveVec.Z) + (camCF.RightVector * moveVec.X) + (Vector3.new(0, moveVec.Y, 0))
+
+                    if moveVec.Magnitude > 0 then
+                        local newPos = hrp.Position + moveDir.Unit * (flySpeed * dt)
+                        hrp.CFrame = CFrame.new(newPos, newPos + camCF.LookVector)
+                    else
+                        hrp.CFrame = CFrame.lookAlong(hrp.Position, Vector3.new(camCF.LookVector.X, 0, camCF.LookVector.Z))
+                    end
+
+                    hrp.AssemblyLinearVelocity = Vector3.new()
+                end)
+            end
+
+            Toggle.MouseButton1Click:Connect(function()
+                isFlying = not isFlying
+                flySpeed = tonumber(SpeedInput.Text) or 35
+                Toggle.Text = isFlying and "已开启 - 运行中" or "纯坐标飞行: OFF"
+                TweenService:Create(Toggle, TweenInfo.new(0.3), {BackgroundColor3 = isFlying and Color3.fromRGB(0, 150, 255) or Color3.fromRGB(60, 60, 60)}):Play()
+                if isFlying then
+                    startFly()
+                else
+                    if flightConnection then
+                        flightConnection:Disconnect()
+                        flightConnection = nil
+                    end
+                    local char = lp.Character
+                    if char then
+                        local hum = char:FindFirstChildOfClass("Humanoid")
+                        if hum then hum.AutoRotate = true end
+                        local animate = char:FindFirstChild("Animate")
+                        if animCache and not animate then
+                            animCache.Parent = char
+                            animCache = nil
+                        end
+                    end
+                end
+            end)
+
+            local function topBtn(t, x, c, f)
+                local b = Instance.new("TextButton", MainFrame)
+                b.Size = UDim2.new(0, 25, 0, 25); b.Position = UDim2.new(1, x, 0, 5); b.Text = t
+                b.BackgroundColor3 = c; b.TextColor3 = Color3.new(1, 1, 1); Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+                b.MouseButton1Click:Connect(f)
+            end
+
+            topBtn("×", -30, Color3.fromRGB(150, 50, 50), function()
+                isFlying = false
+                if flightConnection then flightConnection:Disconnect() end
+                local char = lp.Character
+                if char then
+                    local hum = char:FindFirstChildOfClass("Humanoid")
+                    if hum then hum.AutoRotate = true end
+                    local animate = char:FindFirstChild("Animate")
+                    if animCache and not animate then
+                        animCache.Parent = char
+                    end
+                end
+                ScreenGui:Destroy()
+            end)
+
+            topBtn("-", -60, Color3.fromRGB(70, 70, 70), function()
+                local isCollapsed = MainFrame.Size.Y.Offset < 140
+                local targetH = isCollapsed and 140 or 35
+                TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 180, 0, targetH)}):Play()
+                Toggle.Visible, SpeedInput.Visible = isCollapsed, isCollapsed
+            end)
+
+            JoyButton = Instance.new("TextButton", MainFrame)
+            JoyButton.Size = UDim2.new(0, 26, 0, 26)
+            JoyButton.Position = UDim2.new(0, 6, 0, 2)
+            JoyButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+            JoyButton.BorderSizePixel = 0
+            JoyButton.Text = "摇"
+            JoyButton.TextColor3 = Color3.new(1, 1, 1)
+            JoyButton.TextSize = 13
+            local JoyBtnCorner = Instance.new("UICorner", JoyButton)
+            JoyBtnCorner.CornerRadius = UDim.new(0, 6)
+            JoyButton.ZIndex = 50
+            JoyButton.MouseButton1Click:Connect(function()
+                setJoyMode(not joyMode)
+            end)
+
+            MainFrame.Size = UDim2.new(0, 0, 0, 0)
+            MainFrame:TweenSize(UDim2.new(0, 180, 0, 140), "Out", "Back", 0.5)
+        end
+    end)
+
+    --====================【Tab4 子追自瞄｜FOV圈只筛选目标，吸附单独调节】====================
+    local Tab4 = Window:CreateTab("子追自瞄")
+    local AimbotEnabled = false
+    local FovRadius = 0
+    local AimbotPercent = 0 -- 默认0（无吸附），范围0~100
+    local AimbotOnlyEnemy = true
+    local AimbotTargetPart = "Head"
+    local AimbotLoopConn = nil
+    local fovGui = nil
+    local fovCircleFrame = nil
+
+    -- 创建FOV圈GUI【修改点：Parent改为CoreGui，死亡重生不会消失】
+    local function CreateFovGui()
+        if fovGui then return end
+        fovGui = Instance.new("ScreenGui")
+        fovGui.Name = "AimFovCircleGui"
+        fovGui.IgnoreGuiInset = true
+        fovGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        fovGui.Parent = game:GetService("CoreGui")
+
+        fovCircleFrame = Instance.new("Frame")
+        fovCircleFrame.Name = "FOVCircle"
+        fovCircleFrame.AnchorPoint = Vector2.new(0.5,0.5)
+        fovCircleFrame.Position = UDim2.new(0.5,0,0.5,0)
+        fovCircleFrame.BackgroundTransparency = 1
+        fovCircleFrame.BorderSizePixel = 0
+        fovCircleFrame.Visible = false
+        fovCircleFrame.ZIndex = 99
+        fovCircleFrame.Parent = fovGui
+
+        local uiCorner = Instance.new("UICorner")
+        uiCorner.CornerRadius = UDim.new(1,0)
+        uiCorner.Parent = fovCircleFrame
+
+        local uiStroke = Instance.new("UIStroke")
+        uiStroke.Color = Color3.new(1,1,1)
+        uiStroke.Thickness = 2
+        uiStroke.Transparency = 0.7
+        uiStroke.Parent = fovCircleFrame
+
+        --新增彩虹循环
+        task.spawn(function()
+            local hue = 0
+            while task.wait(0.03) do
+                if not fovCircleFrame or not uiStroke:IsDescendantOf(game) then break end
+                hue = hue + 0.01
+                if hue > 1 then hue = 0 end
+                uiStroke.Color = Color3.fromHSV(hue,1,1)
+            end
+        end)
+    end
+    CreateFovGui()
+
+    -- 更新FOV圈大小（只改画面圆圈，不影响吸附）
+    local function UpdateFovCircleSize(radius)
+        if not fovCircleFrame then return end
+        fovCircleFrame.Size = UDim2.new(0, radius*2, 0, radius*2)
+    end
+
+    Tab4:AddSwitch("开启子追自瞄",function(state)
+        AimbotEnabled = state
+        if AimbotLoopConn then AimbotLoopConn:Disconnect() AimbotLoopConn = nil end
+        if state then
+            AimbotLoopConn = RunService.RenderStepped:Connect(function()
+                if not AimbotEnabled then return end
+                local cam = workspace.CurrentCamera
+                local localChar = lp.Character
+                if not localChar then return end
+                local localHrp = localChar:FindFirstChild("HumanoidRootPart")
+                if not localHrp then return end
+
+                local closestPart = nil
+                local minScreenDist = math.huge
+                for _,plr in ipairs(game.Players:GetPlayers()) do
+                    if plr == lp then continue end
+                    local char = plr.Character
+                    if not char then continue end
+                    local targetPart = char:FindFirstChild(AimbotTargetPart)
+                    if not targetPart then continue end
+                    local hum = char:FindFirstChildOfClass("Humanoid")
+                    if not hum or hum.Health <= 0 then continue end
+                    local screenPos, onScreen = cam:WorldToViewportPoint(targetPart.Position)
+                    if not onScreen then continue end
+                    local screenDist = ((screenPos.X - cam.ViewportSize.X/2)^2 + (screenPos.Y - cam.ViewportSize.Y/2)^2)^0.5
+                    if screenDist < FovRadius and screenDist < minScreenDist then
+                        minScreenDist = screenDist
+                        closestPart = targetPart
+                    end
+                end
+                if closestPart then
+                    local targetCF = CFrame.new(cam.CFrame.Position, closestPart.Position)
+                    local lerpVal = AimbotPercent / 100 -- 百分比转为lerp系数
+                    cam.CFrame = cam.CFrame:Lerp(targetCF, lerpVal)
+                end
+            end)
+        end
+    end)
+
+    Tab4:AddSlider("FOV圈大小",0,400,0,function(val)
+        FovRadius = val
+        UpdateFovCircleSize(val)
+    end)
+
+    Tab4:AddSlider("自瞄吸附强度",0,100,0,function(val)
+        AimbotPercent = val
+    end)
+
+    Tab4:AddSwitch("显示FOV彩虹圈",function(state)
+        if fovCircleFrame then
+            fovCircleFrame.Visible = state
+        end
+    end)
+
+end
