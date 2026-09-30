@@ -1010,13 +1010,14 @@ if success and code then
         end
     end)
 
-    --====================【Tab4 子追自瞄｜FOV圈只筛选目标，吸附单独调节】====================
+    --====================【Tab4 子追自瞄｜FOV圈只筛选目标，吸附单独调节 + 墙体检测】====================
     local Tab4 = Window:CreateTab("子追自瞄")
     local AimbotEnabled = false
     local FovRadius = 0
     local AimbotPercent = 0 -- 默认0（无吸附），范围0~100
     local AimbotOnlyEnemy = true
     local AimbotTargetPart = "Head"
+    local AimbotWallCheck = false --墙体检测开关
     local AimbotLoopConn = nil
     local fovGui = nil
     local fovCircleFrame = nil
@@ -1078,49 +1079,4 @@ if success and code then
                 local cam = workspace.CurrentCamera
                 local localChar = lp.Character
                 if not localChar then return end
-                local localHrp = localChar:FindFirstChild("HumanoidRootPart")
-                if not localHrp then return end
-
-                local closestPart = nil
-                local minScreenDist = math.huge
-                for _,plr in ipairs(game.Players:GetPlayers()) do
-                    if plr == lp then continue end
-                    local char = plr.Character
-                    if not char then continue end
-                    local targetPart = char:FindFirstChild(AimbotTargetPart)
-                    if not targetPart then continue end
-                    local hum = char:FindFirstChildOfClass("Humanoid")
-                    if not hum or hum.Health <= 0 then continue end
-                    local screenPos, onScreen = cam:WorldToViewportPoint(targetPart.Position)
-                    if not onScreen then continue end
-                    local screenDist = ((screenPos.X - cam.ViewportSize.X/2)^2 + (screenPos.Y - cam.ViewportSize.Y/2)^2)^0.5
-                    if screenDist < FovRadius and screenDist < minScreenDist then
-                        minScreenDist = screenDist
-                        closestPart = targetPart
-                    end
-                end
-                if closestPart then
-                    local targetCF = CFrame.new(cam.CFrame.Position, closestPart.Position)
-                    local lerpVal = AimbotPercent / 100 -- 百分比转为lerp系数
-                    cam.CFrame = cam.CFrame:Lerp(targetCF, lerpVal)
-                end
-            end)
-        end
-    end)
-
-    Tab4:AddSlider("FOV圈大小",0,400,0,function(val)
-        FovRadius = val
-        UpdateFovCircleSize(val)
-    end)
-
-    Tab4:AddSlider("自瞄吸附强度",0,100,0,function(val)
-        AimbotPercent = val
-    end)
-
-    Tab4:AddSwitch("显示FOV彩虹圈",function(state)
-        if fovCircleFrame then
-            fovCircleFrame.Visible = state
-        end
-    end)
-
-end
+                local
